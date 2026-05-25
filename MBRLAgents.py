@@ -80,6 +80,7 @@ class PrioritizedSweepingAgent:
         self.Q_sa = np.zeros((n_states, n_actions))
         self.n_counts = np.zeros((n_states, n_actions, n_states))
         self.Rsum = np.zeros((n_states, n_actions, n_states))
+        self.in_queue = {}
         
     def select_action(self, s, epsilon):
         greedy_prob = np.random.rand()
@@ -106,18 +107,24 @@ class PrioritizedSweepingAgent:
         else:
             p = abs(r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s][a])
 
-        if p > self.priority_cutoff:
+        if p > self.priority_cutoff and p > self.in_queue.get((s, a), 0):
+            self.in_queue[(s, a)] = p
             self.queue.put((-p, (s, a))) 
  
         for _ in range(n_planning_updates):
             if self.queue.empty():
                 break
-            _, (s_prev, a_prev) = self.queue.get()
+            p_prev, (s_prev, a_prev) = self.queue.get()
  
+            if self.in_queue.get((s_prev, a_prev), 0) > -p_prev :
+                continue
+
+            self.in_queue.pop((s_prev, a_prev), None)
+
             counts = self.n_counts[s_prev, a_prev]
             s_bar = np.random.choice(self.n_states, p=counts / counts.sum())
             r_bar = self.Rsum[s_prev, a_prev, s_bar] / self.n_counts[s_prev, a_prev, s_bar]
-            
+
             self.Q_sa[s_prev][a_prev] += self.learning_rate * (r_bar + self.gamma * np.max(self.Q_sa[s_bar]) - self.Q_sa[s_prev][a_prev])
  
             for s_i in range(self.n_states):

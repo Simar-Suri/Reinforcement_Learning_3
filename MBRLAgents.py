@@ -100,8 +100,12 @@ class PrioritizedSweepingAgent:
 
         self.n_counts[s, a, s_next] += 1
         self.Rsum[s, a, s_next] += r
- 
-        p = abs(r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s][a])
+        
+        if done:
+            p = abs(r - self.Q_sa[s][a])
+        else:
+            p = abs(r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s][a])
+
         if p > self.priority_cutoff:
             self.queue.put((-p, (s, a))) 
  
@@ -113,7 +117,7 @@ class PrioritizedSweepingAgent:
             counts = self.n_counts[s_prev, a_prev]
             s_bar = np.random.choice(self.n_states, p=counts / counts.sum())
             r_bar = self.Rsum[s_prev, a_prev, s_bar] / self.n_counts[s_prev, a_prev, s_bar]
- 
+            
             self.Q_sa[s_prev][a_prev] += self.learning_rate * (r_bar + self.gamma * np.max(self.Q_sa[s_bar]) - self.Q_sa[s_prev][a_prev])
  
             for s_i in range(self.n_states):
@@ -121,7 +125,8 @@ class PrioritizedSweepingAgent:
                     if self.n_counts[s_i, a_i, s_prev] > 0: 
                         r_i = self.Rsum[s_i, a_i, s_prev] / self.n_counts[s_i, a_i, s_prev]
                         p_back = abs(r_i + self.gamma * np.max(self.Q_sa[s_prev]) - self.Q_sa[s_i][a_i])
-                        if p_back > self.priority_cutoff:
+                        if p_back > self.priority_cutoff and p_back > self.in_queue.get((s_i, a_i), 0):
+                            self.in_queue[(s_i, a_i)] = p_back
                             self.queue.put((-p_back, (s_i, a_i)))
 
     def evaluate(self,eval_env,n_eval_episodes=30, max_episode_length=100):

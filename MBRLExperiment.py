@@ -23,15 +23,15 @@ def experiment():
     wind_proportions = [0.9,1.0]
     n_planning_updatess = [0, 1,3,5] 
     
-    wind_labels = {0.9: 'stochastic', 1.0: 'deterministic'}
-    x = np.arange(0, n_timesteps, eval_interval)  
+    wind_labels = {0.9: 'Stochastic', 1.0: 'Deterministic'}
+    intervals = np.arange(0, n_timesteps, eval_interval)  
  
     times = {'DynaAgent': {}, 'PrioritizedSweepingAgent': {}}
     q_curves = {}  
 
     for wind_prop in wind_proportions:
         label = wind_labels[wind_prop]
-        plot = LearningCurvePlot(title=f'Dyna – {label} environment')
+        plot = LearningCurvePlot(title=f'Dyna : {label}')
         for n in n_planning_updatess:
             curves, avg_time = run_repetitions('DynaAgent', n_timesteps, n_repetitions, eval_interval, 
                                              learning_rate, gamma, epsilon, n, wind_prop)
@@ -40,29 +40,29 @@ def experiment():
             mean_curve = smooth(np.mean(curves, axis=0), 5)
  
             if n == 0:
-                curve_label = 'Q-learning (n=0)'
+                curve_label = 'Qlearning'
                 q_curves[wind_prop] = curves 
             else:
                 curve_label = f'Dyna n={n}'
                 
-            plot.add_curve(x, mean_curve, label=curve_label)
+            plot.add_curve(intervals, mean_curve, label=curve_label)
 
         plot.save(name=f'dyna_{label}.png')
  
     for wind_prop in wind_proportions:
         label = wind_labels[wind_prop]
-        plot = LearningCurvePlot(title=f'Prioritized Sweeping:{label} environment')
+        plot = LearningCurvePlot(title=f'Prioritized Sweeping : {label} environment')
         
         q_mean = smooth(np.mean(q_curves[wind_prop], axis=0), 5)
-        plot.add_curve(x, q_mean, label='Q-learning (n=0)')
+        plot.add_curve(intervals, q_mean, label='Qlearning')
  
-        for n in [1, 3, 5]:
+        for n in n_planning_updatess[1:]:
             curves, avg_time = run_repetitions('PrioritizedSweepingAgent', n_timesteps, n_repetitions, eval_interval, 
                                              learning_rate, gamma, epsilon, n, wind_prop)
             times['PrioritizedSweepingAgent'][n] = avg_time
  
             mean_curve = smooth(np.mean(curves, axis=0), 5)
-            plot.add_curve(x, mean_curve, label=f'PS n={n}')
+            plot.add_curve(intervals, mean_curve, label=f'PS n={n}')
  
         plot.save(name=f'ps_{label}.png')
 
@@ -71,18 +71,18 @@ def experiment():
  
     for wind_prop in wind_proportions:
         label = wind_labels[wind_prop]
-        plot = LearningCurvePlot(title=f'Comparison:{label} environment')
+        plot = LearningCurvePlot(title=f'Comparison : {label} environment')
 
         q_mean = smooth(np.mean(q_curves[wind_prop], axis=0), 5)
-        plot.add_curve(x, q_mean, label='Q-learning')
+        plot.add_curve(intervals, q_mean, label='Qlearning')
 
         dyna_curves, _ = run_repetitions('DynaAgent', n_timesteps, n_repetitions, eval_interval, 
                                          learning_rate, gamma, epsilon, best_dynan, wind_prop)
-        plot.add_curve(x, smooth(np.mean(dyna_curves, axis=0), 5), label=f'Dyna (n={best_dynan})')
+        plot.add_curve(intervals, smooth(np.mean(dyna_curves, axis=0), 5), label=f'Dyna (n={best_dynan})')
 
         ps_curves, _ = run_repetitions('PrioritizedSweepingAgent', n_timesteps, n_repetitions, eval_interval, 
                                        learning_rate, gamma, epsilon, best_psn, wind_prop)
-        plot.add_curve(x, smooth(np.mean(ps_curves, axis=0), 5), label=f'PS (n={best_psn})')
+        plot.add_curve(intervals, smooth(np.mean(ps_curves, axis=0), 5), label=f'PS (n={best_psn})')
  
         plot.save(name=f'comparison_{label}.png')
  

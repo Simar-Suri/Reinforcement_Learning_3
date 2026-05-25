@@ -115,8 +115,8 @@ class PrioritizedSweepingAgent:
             if self.queue.empty():
                 break
             p_prev, (s_prev, a_prev) = self.queue.get()
- 
-            if self.in_queue.get((s_prev, a_prev), 0) > -p_prev :
+
+            if self.in_queue.get((s_prev, a_prev), None) != -p_prev:
                 continue
 
             self.in_queue.pop((s_prev, a_prev), None)

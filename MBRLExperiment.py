@@ -24,7 +24,7 @@ def experiment():
     n_planning_updatess = [0, 1,3,5] 
     
     wind_labels = {0.9: 'Stochastic', 1.0: 'Deterministic'}
-    intervals = np.arange(0, n_timesteps, eval_interval)  
+    intervals = np.arange(0, n_timesteps+1, eval_interval)
  
     times = {'DynaAgent': {}, 'PrioritizedSweepingAgent': {}}
     q_curves = {}  

@@ -83,9 +83,7 @@ def experiment():
         ps_curves, _ = run_repetitions('PrioritizedSweepingAgent', n_timesteps, n_repetitions, eval_interval, 
                                        learning_rate, gamma, epsilon, best_psn, wind_prop)
         plot.add_curve(intervals, smooth(np.mean(ps_curves, axis=0), 5), label=f'PS (n={best_psn})')
- 
         plot.save(name=f'comparison_{label}.png')
- 
 
     print("Algorithm  |  n_planning  |   Time")
     q_t = times['DynaAgent'].get(0)
@@ -100,20 +98,17 @@ def experiment():
 def run_repetitions(agent_type, n_timesteps, n_repetitions, eval_interval, learning_rate, gamma, epsilon, n_planning_updates,
                     wind_proportion):
 
-    n_eval_points = n_timesteps // eval_interval + 1  
-    curves = np.zeros((n_repetitions, n_eval_points))
+    n_eval_intervals = n_timesteps // eval_interval + 1  
+    curves = np.zeros((n_repetitions, n_eval_intervals))
     runtimes = []
  
-    for rep in range(n_repetitions):
+    for i in range(n_repetitions):
         t_start = time.time()
 
         env = WindyGridworld(wind_proportion=wind_proportion)
         eval_env = WindyGridworld(wind_proportion=wind_proportion)
- 
-        if agent_type == "DynaAgent":
-            agent = DynaAgent(env.n_states, env.n_actions, learning_rate, gamma)
-        else: 
-            agent = PrioritizedSweepingAgent(env.n_states, env.n_actions, learning_rate, gamma)
+
+        agent = DynaAgent(env.n_states, env.n_actions, learning_rate, gamma) if agent_type == "DynaAgent" else PrioritizedSweepingAgent(env.n_states, env.n_actions, learning_rate, gamma)
  
         s = env.reset()
         eval_idx = 0
@@ -121,20 +116,16 @@ def run_repetitions(agent_type, n_timesteps, n_repetitions, eval_interval, learn
         for i in range(n_timesteps):
             if i % eval_interval == 0:
                 mean_return = agent.evaluate(eval_env)
-                curves[rep, eval_idx] = mean_return
+                curves[i, eval_idx] = mean_return
                 eval_idx += 1
  
             a = agent.select_action(s, epsilon)
             s_next, r, done = env.step(a)
             agent.update(s, a, r, done, s_next, n_planning_updates)
-
-            if done:
-                s = env.reset()
-            else:
-                s = s_next
+            s = env.reset() if done else s = s_next
  
         runtimes.append(time.time() - t_start)
- 
+
     avg_runtime = np.mean(runtimes)
     return curves, avg_runtime
  

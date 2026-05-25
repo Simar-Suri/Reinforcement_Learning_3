@@ -102,27 +102,30 @@ def run_repetitions(agent_type, n_timesteps, n_repetitions, eval_interval, learn
     curves = np.zeros((n_repetitions, n_eval_intervals))
     runtimes = []
  
-    for i in range(n_repetitions):
+    for rep in range(n_repetitions):
         t_start = time.time()
 
         env = WindyGridworld(wind_proportion=wind_proportion)
         eval_env = WindyGridworld(wind_proportion=wind_proportion)
 
-        agent = DynaAgent(env.n_states, env.n_actions, learning_rate, gamma) if agent_type == "DynaAgent" else PrioritizedSweepingAgent(env.n_states, env.n_actions, learning_rate, gamma)
- 
+        if agent_type == "DynaAgent":
+            agent = DynaAgent(env.n_states, env.n_actions, learning_rate, gamma)
+        else:
+            agent = PrioritizedSweepingAgent(env.n_states, env.n_actions, learning_rate, gamma)
+
         s = env.reset()
         eval_idx = 0
  
-        for i in range(n_timesteps):
-            if i % eval_interval == 0:
+        for t in range(n_timesteps):
+            if t % eval_interval == 0:
                 mean_return = agent.evaluate(eval_env)
-                curves[i, eval_idx] = mean_return
+                curves[rep, eval_idx] = mean_return
                 eval_idx += 1
  
             a = agent.select_action(s, epsilon)
             s_next, r, done = env.step(a)
             agent.update(s, a, r, done, s_next, n_planning_updates)
-            s = env.reset() if done else s = s_next
+            s = env.reset() if done else s_next
  
         runtimes.append(time.time() - t_start)
 

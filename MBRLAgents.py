@@ -18,36 +18,38 @@ class DynaAgent:
         self.learning_rate = learning_rate
         self.gamma = gamma
         self.Q_sa = np.zeros((n_states, n_actions))
-        self.model = {}
+        self.n_counts = np.zeros((n_states, n_actions, n_states))
+        self.Rsum = np.zeros((n_states, n_actions, n_states))
         
     def select_action(self, s, epsilon):
         greedy_prob = np.random.rand()
         if greedy_prob <= epsilon:
-            action = np.random.randint(0, self.n_actions)
+            a = np.random.randint(0, self.n_actions)
         else:
-            action = np.argmax(self.Q_sa[s])
-        return action
+            a = np.argmax(self.Q_sa[s])
+        return a
         
     def update(self, s, a, r, done, s_next, n_planning_updates):
-        # Direct Q-learning update
+        
+        self.n_counts[s, a, s_next] += 1
+        self.Rsum[s, a, s_next] += r
+ 
         if done:
             self.Q_sa[s][a] += self.learning_rate * (r - self.Q_sa[s][a])
         else: 
             self.Q_sa[s][a] += self.learning_rate * (r + (self.gamma * np.max(self.Q_sa[s_next])) - self.Q_sa[s][a])
-            
-        self.model[(s, a)] = (r, s_next, done)
+ 
+        prev_states = np.argwhere(self.n_counts.sum(axis=2) > 0)
 
-        # Planning loops
-        if len(self.model) > 0:
-            for _ in range(n_planning_updates):
-                s_prev, a_prev = list(self.model.keys())[np.random.randint(0, len(self.model))]
-                r_bar, s_bar, done_prev = self.model[(s_prev, a_prev)]
-                
-                
-                if done_prev:
-                    self.Q_sa[s_prev][a_prev] += self.learning_rate * (r_bar - self.Q_sa[s_prev][a_prev])
-                else:
-                    self.Q_sa[s_prev][a_prev] += self.learning_rate * (r_bar + self.gamma * np.max(self.Q_sa[s_bar]) - self.Q_sa[s_prev][a_prev])
+        for _ in range(n_planning_updates):
+            i = np.random.randint(len(prev_states))
+            s_prev, a_prev = prev_states[i]
+ 
+            counts = self.n_counts[s_prev, a_prev]
+            s_bar = np.random.choice(self.n_states, p=counts / counts.sum())
+            r_bar = self.Rsum[s_prev, a_prev, s_bar] / self.n_counts[s_prev, a_prev, s_bar]
+ 
+            self.Q_sa[s_prev][a_prev] += self.learning_rate * (r_bar + self.gamma * np.max(self.Q_sa[s_bar]) - self.Q_sa[s_prev][a_prev])
 
     def evaluate(self,eval_env,n_eval_episodes=30, max_episode_length=100):
         returns = []  # list to store the reward per episode
@@ -55,7 +57,7 @@ class DynaAgent:
             s = eval_env.reset()
             R_ep = 0
             for t in range(max_episode_length):
-                a = np.argmax(self.Q_sa[s]) # greedy action selection
+                a = np.argmax(self.Q_sa[s]) # greedy a selection
                 s_prime, r, done = eval_env.step(a)
                 R_ep += r
                 if done:
@@ -76,7 +78,6 @@ class PrioritizedSweepingAgent:
         self.priority_cutoff = priority_cutoff
         self.queue = PriorityQueue()
         self.Q_sa = np.zeros((n_states, n_actions))
-        self.model = {}
         self.n_counts = np.zeros((n_states, n_actions, n_states))
         self.Rsum = np.zeros((n_states, n_actions, n_states))
         
@@ -99,27 +100,22 @@ class PrioritizedSweepingAgent:
 
         self.n_counts[s, a, s_next] += 1
         self.Rsum[s, a, s_next] += r
-        self.model[(s, a)] = (r, s_next, done)
-
-        # Calculate tracking priority
+ 
         p = abs(r + self.gamma * np.max(self.Q_sa[s_next]) - self.Q_sa[s][a])
         if p > self.priority_cutoff:
             self.queue.put((-p, (s, a))) 
-
+ 
         for _ in range(n_planning_updates):
             if self.queue.empty():
                 break
             _, (s_prev, a_prev) = self.queue.get()
-
-            r_bar, s_bar, done_prev = self.model[(s_prev, a_prev)]
-
-            _, _, done_prev = self.model[(s_prev, a_prev)]
-            if done_prev:
-                self.Q_sa[s_prev][a_prev] += self.learning_rate * (r_bar - self.Q_sa[s_prev][a_prev])
-            else:
-                self.Q_sa[s_prev][a_prev] += self.learning_rate * (r_bar + self.gamma * np.max(self.Q_sa[s_bar]) - self.Q_sa[s_prev][a_prev])
-
-            # Backwards sweeping propagation loop
+ 
+            counts = self.n_counts[s_prev, a_prev]
+            s_bar = np.random.choice(self.n_states, p=counts / counts.sum())
+            r_bar = self.Rsum[s_prev, a_prev, s_bar] / self.n_counts[s_prev, a_prev, s_bar]
+ 
+            self.Q_sa[s_prev][a_prev] += self.learning_rate * (r_bar + self.gamma * np.max(self.Q_sa[s_bar]) - self.Q_sa[s_prev][a_prev])
+ 
             for s_i in range(self.n_states):
                 for a_i in range(self.n_actions):
                     if self.n_counts[s_i, a_i, s_prev] > 0: 
@@ -134,7 +130,7 @@ class PrioritizedSweepingAgent:
             s = eval_env.reset()
             R_ep = 0
             for t in range(max_episode_length):
-                a = np.argmax(self.Q_sa[s]) # greedy action selection
+                a = np.argmax(self.Q_sa[s]) # greedy a selection
                 s_prime, r, done = eval_env.step(a)
                 R_ep += r
                 if done:
@@ -175,7 +171,7 @@ def test():
     continuous_mode = False
     
     for t in range(n_timesteps):            
-        # Select action, transition, update policy
+        # Select a, transition, update policy
         a = pi.select_action(s,epsilon)
         s_next,r,done = env.step(a)
         pi.update(s=s,a=a,r=r,done=done,s_next=s_next,n_planning_updates=n_planning_updates)

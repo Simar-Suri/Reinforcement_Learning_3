@@ -13,8 +13,8 @@ def experiment():
     gamma = 1.0
     learning_rate = 0.2
     epsilon = 0.1
-    kappa = 0.001                     # exploration bonus factor
-    wind_proportion = 0.9             # stochastic environment only
+    kappa = 0.001                     # exploration bonus
+    wind_proportion = 0.9
 
     n_planning_updates_list = [0, 1,3,5]
 
@@ -77,13 +77,11 @@ def run_repetitions(agent_type, n_timesteps, n_repetitions, eval_interval, learn
         eval_idx = 0
 
         for t in range(n_timesteps):
-            # Evaluate at regular intervals
             if t % eval_interval == 0:
                 mean_return = agent.evaluate(eval_env)
                 curves[rep, eval_idx] = mean_return
                 eval_idx += 1
 
-            # Select action, step, update
             a = agent.select_action(s, epsilon)
             s_next, r, done = env.step(a)
             agent.update(s, a, r, done, s_next, n_planning_updates)
